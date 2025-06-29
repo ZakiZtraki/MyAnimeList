@@ -4,6 +4,11 @@
 config.json
 mal_token.json
 
+#Github copilot
+#  This file is used by GitHub Copilot to store user preferences and settings.
+#  It is recommended to keep it out of version control.
+.github/copilot.yml
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
