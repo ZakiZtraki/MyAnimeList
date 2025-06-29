@@ -121,24 +121,40 @@ class MALSonarrSync:
         """Get a valid access token, refreshing if necessary"""
         if not self.tokens.get('access_token'):
             return None
-            
-        if time.time() >= self.tokens.get('expires_at', 0):
+        
+        expires_at = self.tokens.get('expires_at', 0)
+        # Handle ISO string or float
+        if isinstance(expires_at, str):
+            try:
+                expires_at_dt = datetime.fromisoformat(expires_at)
+                expires_at_ts = expires_at_dt.timestamp()
+            except Exception:
+                # fallback: treat as 0 if parsing fails
+                expires_at_ts = 0
+        else:
+            expires_at_ts = float(expires_at)
+        
+        if time.time() >= expires_at_ts:
             if not self.refresh_token():
                 return None
-                
         return self.tokens['access_token']
     
     def get_sonarr_anime(self):
         """Fetch anime series from Sonarr"""
         if not self.config.get('sonarr', {}).get('api_url'):
+            print("Sonarr API URL not configured")
             return []
             
         headers = {'X-Api-Key': self.config['sonarr']['api_key']}
         
         try:
+            print(f"Fetching series from Sonarr: {self.config['sonarr']['api_url']}")
             response = requests.get(self.config['sonarr']['api_url'], headers=headers)
+            
             if response.status_code == 200:
                 series = response.json()
+                print(f"Found {len(series)} total series in Sonarr")
+                
                 # Filter for anime series
                 anime_series = []
                 for show in series:
@@ -148,30 +164,57 @@ class MALSonarrSync:
                             'year': show.get('year'),
                             'status': show.get('status', ''),
                             'overview': show.get('overview', ''),
-                            'sonarr_id': show.get('id')
+                            'sonarr_id': show.get('id'),
+                            'path': show.get('path', ''),
+                            'tags': show.get('tags', [])
                         })
+                
+                print(f"Identified {len(anime_series)} anime series")
                 return anime_series
+            else:
+                print(f"Sonarr API returned status code: {response.status_code}")
+                print(f"Response content: {response.text}")
+                
         except Exception as e:
-            print(f"Error fetching Sonarr data: {e}")
+            print(f"Error fetching Sonarr data: {str(e)}")
+            print(f"Full error details: {repr(e)}")
         
         return []
     
     def is_anime_series(self, series):
         """Determine if a series is anime"""
+        # Check if the series has tags
+        tags = []
+        if isinstance(series.get('tags'), list):
+            tags = series.get('tags', [])
+        elif isinstance(series.get('tags'), str):
+            tags = [{'label': tag.strip()} for tag in series.get('tags', '').split(',')]
+
         # Check tags
-        tags = series.get('tags', [])
         for tag in tags:
-            if 'anime' in tag.get('label', '').lower():
+            if isinstance(tag, dict) and 'label' in tag:
+                if 'anime' in tag['label'].lower():
+                    return True
+            elif isinstance(tag, str) and 'anime' in tag.lower():
                 return True
         
         # Check series type
-        series_type = series.get('seriesType', '').lower()
+        series_type = str(series.get('seriesType', '')).lower()
         if 'anime' in series_type:
             return True
         
-        # Check title patterns (basic heuristic)
-        title = series.get('title', '').lower()
-        anime_indicators = ['anime', 'manga', 'otaku']
+        # Check path and folder name for anime indicators
+        path = str(series.get('path', '')).lower()
+        if 'anime' in path:
+            return True
+            
+        # Check title patterns (enhanced heuristic)
+        title = str(series.get('title', '')).lower()
+        anime_indicators = [
+            'anime', 'manga', '-san', '-kun', '-chan', 
+            'season', '季', 'の', 'シーズン',
+            'japanese', '日本'
+        ]
         return any(indicator in title for indicator in anime_indicators)
     
     def clean_title(self, title):
