@@ -1,3 +1,4 @@
-requests
-fuzzywuzzy
-python-levenshtein
+Flask==3.0.0
+requests==2.31.0
+fuzzywuzzy==0.18.0
+python-levenshtein==0.23.0

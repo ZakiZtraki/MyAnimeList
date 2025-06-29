@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - MAL Sonarr Sync{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1 class="mb-4">
+            <i class="fas fa-tachometer-alt"></i>
+            Dashboard
+        </h1>
+    </div>
+</div>
+
+<!-- Connection Status -->
+<div class="row connection-status">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="fas fa-tv"></i>
+                    Sonarr Connection
+                </h5>
+                <p class="card-text">
+                    <span id="sonarr-indicator" class="connection-indicator disconnected"></span>
+                    <span id="sonarr-text">Checking...</span>
+                </p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="fas fa-list"></i>
+                    MyAnimeList Authentication
+                </h5>
+                <p class="card-text">
+                    <span id="mal-indicator" class="connection-indicator disconnected"></span>
+                    <span id="mal-text">Checking...</span>
+                </p>
+                {% if not authenticated %}
+                <a href="{{ url_for('authenticate') }}" class="btn btn-primary btn-sm">
+                    <i class="fas fa-sign-in-alt"></i>
+                    Authenticate with MAL
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if not config_exists %}
+<!-- Configuration Required -->
+<div class="row">
+    <div class="col-md-12">
+        <div class="alert alert-warning" role="alert">
+            <h4 class="alert-heading">
+                <i class="fas fa-exclamation-triangle"></i>
+                Configuration Required
+            </h4>
+            <p>Before you can start syncing, you need to configure your Sonarr and MyAnimeList settings.</p>
+            <hr>
+            <a href="{{ url_for('config') }}" class="btn btn-warning">
+                <i class="fas fa-cog"></i>
+                Go to Configuration
+            </a>
+        </div>
+    </div>
+</div>
+{% else %}
+<!-- Main Actions -->
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-sync-alt"></i>
+                    Sync Actions
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <button type="button" class="btn btn-info btn-lg w-100 mb-3" onclick="previewSync()">
+                            <i class="fas fa-eye"></i>
+                            <div class="loading-spinner" id="preview-spinner">
+                                <i class="fas fa-spinner fa-spin"></i>
+                            </div>
+                            Preview Sync
+                        </button>
+                        <p class="text-muted">See what would be synced without making changes</p>
+                    </div>
+                    <div class="col-md-4">
+                        <button type="

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}MAL Sonarr Sync{% endblock %}</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .status-badge {
+            font-size: 0.8em;
+        }
+        .match-score {
+            font-weight: bold;
+        }
+        .high-score { color: #28a745; }
+        .medium-score { color: #ffc107; }
+        .low-score { color: #dc3545; }
+        .sync-item {
+            border-left: 4px solid #e9ecef;
+            margin-bottom: 10px;
+            padding: 10px;
+        }
+        .sync-item.will-sync { border-left-color: #28a745; }
+        .sync-item.wont-sync { border-left-color: #dc3545; }
+        .sync-item.already-synced { border-left-color: #6c757d; }
+        .loading-spinner {
+            display: none;
+        }
+        .navbar-brand i {
+            margin-right: 8px;
+        }
+        .connection-status {
+            margin-bottom: 20px;
+        }
+        .connection-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .connected { background-color: #28a745; }
+        .disconnected { background-color: #dc3545; }
+        .footer {
+            margin-top: 50px;
+            padding: 20px 0;
+            border-top: 1px solid #e9ecef;
+            color: #6c757d;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i class="fas fa-sync-alt"></i>
+                MAL Sonarr Sync
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('index') }}">
+                            <i class="fas fa-home"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('config') }}">
+                            <i class="fas fa-cog"></i> Configuration
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container mt-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2024 MAL Sonarr Sync - Automatically sync your anime from Sonarr to MyAnimeList</p>
+        </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Utility functions
+        function showLoading(elementId) {
+            const element = document.getElementById(elementId);
+            if (element) element.style.display = 'inline-block';
+        }
+
+        function hideLoading(elementId) {
+            const element = document.getElementById(elementId);
+            if (element) element.style.display = 'none';
+        }
+
+        function updateConnectionStatus() {
+            fetch('/api/test_connection')
+                .then(response => response.json())
+                .then(data => {
+                    // Update Sonarr status
+                    const sonarrIndicator = document.getElementById('sonarr-indicator');
+                    const sonarrText = document.getElementById('sonarr-text');
+                    if (sonarrIndicator && sonarrText) {
+                        sonarrIndicator.className = `connection-indicator ${data.sonarr ? 'connected' : 'disconnected'}`;
+                        sonarrText.textContent = data.messages.sonarr;
+                    }
+
+                    // Update MAL status
+                    const malIndicator = document.getElementById('mal-indicator');
+                    const malText = document.getElementById('mal-text');
+                    if (malIndicator && malText) {
+                        malIndicator.className = `connection-indicator ${data.mal ? 'connected' : 'disconnected'}`;
+                        malText.textContent = data.messages.mal;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking connection status:', error);
+                });
+        }
+
+        // Check connection status on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            updateConnectionStatus();
+        });
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

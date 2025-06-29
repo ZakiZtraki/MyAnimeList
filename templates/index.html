@@ -1,0 +1,421 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - MAL Sonarr Sync{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1 class="mb-4">
+            <i class="fas fa-tachometer-alt"></i>
+            Dashboard
+        </h1>
+    </div>
+</div>
+
+<!-- Connection Status -->
+<div class="row connection-status">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="fas fa-tv"></i>
+                    Sonarr Connection
+                </h5>
+                <p class="card-text">
+                    <span id="sonarr-indicator" class="connection-indicator disconnected"></span>
+                    <span id="sonarr-text">Checking...</span>
+                </p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="fas fa-list"></i>
+                    MyAnimeList Authentication
+                </h5>
+                <p class="card-text">
+                    <span id="mal-indicator" class="connection-indicator disconnected"></span>
+                    <span id="mal-text">Checking...</span>
+                </p>
+                {% if not authenticated %}
+                <a href="{{ url_for('authenticate') }}" class="btn btn-primary btn-sm">
+                    <i class="fas fa-sign-in-alt"></i>
+                    Authenticate with MAL
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if not config_exists %}
+<!-- Configuration Required -->
+<div class="row">
+    <div class="col-md-12">
+        <div class="alert alert-warning" role="alert">
+            <h4 class="alert-heading">
+                <i class="fas fa-exclamation-triangle"></i>
+                Configuration Required
+            </h4>
+            <p>Before you can start syncing, you need to configure your Sonarr and MyAnimeList settings.</p>
+            <hr>
+            <a href="{{ url_for('config') }}" class="btn btn-warning">
+                <i class="fas fa-cog"></i>
+                Go to Configuration
+            </a>
+        </div>
+    </div>
+</div>
+{% else %}
+<!-- Main Actions -->
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-sync-alt"></i>
+                    Sync Actions
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <button type="button" class="btn btn-warning btn-lg w-100 mb-3" onclick="dryRunSync()">
+                            <i class="fas fa-search"></i>
+                            <div class="loading-spinner" id="dryrun-spinner">
+                                <i class="fas fa-spinner fa-spin"></i>
+                            </div>
+                            Dry Run
+                        </button>
+                        <p class="text-muted">Test the sync process without adding anything to MAL</p>
+                    </div>
+                    <div class="col-md-4">
+                        <button type="button" class="btn btn-success btn-lg w-100 mb-3" onclick="performSync()">
+                            <i class="fas fa-sync"></i>
+                            <div class="loading-spinner" id="sync-spinner">
+                                <i class="fas fa-spinner fa-spin"></i>
+                            </div>
+                            Sync Now
+                        </button>
+                        <p class="text-muted">Add matching anime to your MAL list</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Results Section -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card" id="results-card" style="display: none;">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-list-ul"></i>
+                    <span id="results-title">Results</span>
+                </h5>
+                <div>
+                    <span class="badge bg-success" id="success-count">0</span>
+                    <span class="badge bg-warning" id="warning-count">0</span>
+                    <span class="badge bg-danger" id="error-count">0</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="results-container">
+                    <!-- Results will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sonarr Anime List -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-tv"></i>
+                    Anime in Sonarr
+                </h5>
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="loadSonarrAnime()">
+                    <i class="fas fa-refresh"></i>
+                    Refresh
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="sonarr-anime-list">
+                    <div class="text-center">
+                        <button type="button" class="btn btn-primary" onclick="loadSonarrAnime()">
+                            <i class="fas fa-download"></i>
+                            Load Anime from Sonarr
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentResults = [];
+
+function previewSync() {
+    showLoading('preview-spinner');
+    
+    fetch('/api/sync_preview')
+        .then(response => response.json())
+        .then(data => {
+            hideLoading('preview-spinner');
+            displayResults(data, 'Sync Preview');
+        })
+        .catch(error => {
+            hideLoading('preview-spinner');
+            console.error('Error:', error);
+            alert('Error loading preview: ' + error.message);
+        });
+}
+
+function dryRunSync() {
+    showLoading('dryrun-spinner');
+    
+    fetch('/api/sync', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ dry_run: true })
+    })
+        .then(response => response.json())
+        .then(data => {
+            hideLoading('dryrun-spinner');
+            displaySyncResults(data, 'Dry Run Results');
+        })
+        .catch(error => {
+            hideLoading('dryrun-spinner');
+            console.error('Error:', error);
+            alert('Error performing dry run: ' + error.message);
+        });
+}
+
+function performSync() {
+    if (!confirm('This will add anime to your MyAnimeList. Are you sure you want to continue?')) {
+        return;
+    }
+    
+    showLoading('sync-spinner');
+    
+    fetch('/api/sync', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ dry_run: false })
+    })
+        .then(response => response.json())
+        .then(data => {
+            hideLoading('sync-spinner');
+            displaySyncResults(data, 'Sync Results');
+        })
+        .catch(error => {
+            hideLoading('sync-spinner');
+            console.error('Error:', error);
+            alert('Error performing sync: ' + error.message);
+        });
+}
+
+function displayResults(data, title) {
+    currentResults = data;
+    
+    const resultsCard = document.getElementById('results-card');
+    const resultsTitle = document.getElementById('results-title');
+    const resultsContainer = document.getElementById('results-container');
+    
+    resultsTitle.textContent = title;
+    resultsCard.style.display = 'block';
+    
+    // Update counters
+    let successCount = 0;
+    let warningCount = 0;
+    let errorCount = 0;
+    
+    data.forEach(item => {
+        if (item.will_sync) {
+            successCount++;
+        } else if (item.match_found && item.match_score < 75) {
+            warningCount++;
+        } else {
+            errorCount++;
+        }
+    });
+    
+    document.getElementById('success-count').textContent = successCount;
+    document.getElementById('warning-count').textContent = warningCount;
+    document.getElementById('error-count').textContent = errorCount;
+    
+    // Generate HTML
+    let html = '';
+    data.forEach(item => {
+        const scoreClass = item.match_score >= 85 ? 'high-score' : 
+                          item.match_score >= 65 ? 'medium-score' : 'low-score';
+        
+        const syncClass = item.will_sync ? 'will-sync' : 
+                         item.already_in_list ? 'already-synced' : 'wont-sync';
+        
+        html += `
+            <div class="sync-item ${syncClass}">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>${item.sonarr_title}</h6>
+                        <small class="text-muted">Status: ${item.sonarr_status}</small>
+                    </div>
+                    <div class="col-md-4">
+                        ${item.match_found ? `
+                            <strong>${item.mal_title}</strong><br>
+                            <small class="text-muted">MAL ID: ${item.mal_id}</small>
+                        ` : '<em>No match found</em>'}
+                    </div>
+                    <div class="col-md-2 text-end">
+                        <span class="match-score ${scoreClass}">${item.match_score.toFixed(1)}%</span><br>
+                        ${item.will_sync ? '<span class="badge bg-success">Will Sync</span>' : 
+                          item.already_in_list ? '<span class="badge bg-secondary">In List</span>' : 
+                          '<span class="badge bg-warning">Skip</span>'}
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    resultsContainer.innerHTML = html;
+}
+
+function displaySyncResults(data, title) {
+    currentResults = data;
+    
+    const resultsCard = document.getElementById('results-card');
+    const resultsTitle = document.getElementById('results-title');
+    const resultsContainer = document.getElementById('results-container');
+    
+    resultsTitle.textContent = title;
+    resultsCard.style.display = 'block';
+    
+    // Update counters
+    let successCount = 0;
+    let warningCount = 0;
+    let errorCount = 0;
+    
+    data.forEach(item => {
+        if (item.success) {
+            successCount++;
+        } else if (item.message.includes('score too low') || item.message.includes('Already in')) {
+            warningCount++;
+        } else {
+            errorCount++;
+        }
+    });
+    
+    document.getElementById('success-count').textContent = successCount;
+    document.getElementById('warning-count').textContent = warningCount;
+    document.getElementById('error-count').textContent = errorCount;
+    
+    // Generate HTML
+    let html = '';
+    data.forEach(item => {
+        const scoreClass = item.match_score >= 85 ? 'high-score' : 
+                          item.match_score >= 65 ? 'medium-score' : 'low-score';
+        
+        const resultClass = item.success ? 'will-sync' : 'wont-sync';
+        
+        html += `
+            <div class="sync-item ${resultClass}">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>${item.sonarr_title}</h6>
+                    </div>
+                    <div class="col-md-4">
+                        <span class="match-score ${scoreClass}">${item.match_score.toFixed(1)}%</span>
+                    </div>
+                    <div class="col-md-2 text-end">
+                        ${item.success ? '<span class="badge bg-success">Success</span>' : 
+                          '<span class="badge bg-danger">Failed</span>'}
+                    </div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-md-12">
+                        <small class="text-muted">${item.message}</small>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    resultsContainer.innerHTML = html;
+}
+
+function loadSonarrAnime() {
+    const container = document.getElementById('sonarr-anime-list');
+    container.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
+    
+    fetch('/api/sonarr_anime')
+        .then(response => response.json())
+        .then(data => {
+            let html = '';
+            
+            if (data.length === 0) {
+                html = '<div class="alert alert-info">No anime found in Sonarr. Make sure your series have "anime" tags.</div>';
+            } else {
+                html = `
+                    <div class="mb-3">
+                        <strong>${data.length}</strong> anime series found in Sonarr
+                    </div>
+                    <div class="row">
+                `;
+                
+                data.forEach(anime => {
+                    html += `
+                        <div class="col-md-6 col-lg-4 mb-3">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h6 class="card-title">${anime.title}</h6>
+                                    <p class="card-text">
+                                        <small class="text-muted">
+                                            Status: ${anime.status}<br>
+                                            ${anime.year ? `Year: ${anime.year}` : ''}
+                                        </small>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += '</div>';
+            }
+            
+            container.innerHTML = html;
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            container.innerHTML = '<div class="alert alert-danger">Error loading anime from Sonarr</div>';
+        });
+}
+
+// Auto-refresh connection status every 30 seconds
+setInterval(updateConnectionStatus, 30000);
+</script>
+{% endblock %}button" class="btn btn-info btn-lg w-100 mb-3" onclick="previewSync()">
+                            <i class="fas fa-eye"></i>
+                            <div class="loading-spinner" id="preview-spinner">
+                                <i class="fas fa-spinner fa-spin"></i>
+                            </div>
+                            Preview Sync
+                        </button>
+                        <p class="text-muted">See what would be synced without making changes</p>
+                    </div>
+                    <div class="col-md-4">
+                        <button type="

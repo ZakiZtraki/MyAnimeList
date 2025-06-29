@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+
+{% block title %}Configuration - MAL Sonarr Sync{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1 class="mb-4">
+            <i class="fas fa-cog"></i>
+            Configuration
+        </h1>
+    </div>
+</div>
+
+<form method="POST" action="{{ url_for('save_config') }}">
+    <!-- Sonarr Configuration -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-tv"></i>
+                Sonarr Configuration
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="sonarr_url" class="form-label">Sonarr URL</label>
+                        <input type="url" class="form-control" id="sonarr_url" name="sonarr_url" 
+                               value="{{ config.get('sonarr', {}).get('api_url', '').replace('/api/v3/series', '') }}"
+                               placeholder="http://localhost:8989" required>
+                        <div class="form-text">Your Sonarr instance URL (without /api/v3/series)</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="sonarr_key" class="form-label">API Key</label>
+                        <input type="password" class="form-control" id="sonarr_key" name="sonarr_key" 
+                               value="{{ config.get('sonarr', {}).get('api_key', '') }}"
+                               placeholder="Your Sonarr API key" required>
+                        <div class="form-text">Found in Sonarr Settings → General</div>
+                    </div>
+                </div>
+            </div>
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i>
+                <strong>How to get your Sonarr API key:</strong>
+                <ol class="mb-0 mt-2">
+                    <li>Open Sonarr web interface</li>
+                    <li>Go to Settings → General</li>
+                    <li>Find the "API Key" field and copy the value</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <!-- MyAnimeList Configuration -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-list"></i>
+                MyAnimeList API Configuration
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="mal_client_id" class="form-label">Client ID</label>
+                        <input type="text" class="form-control" id="mal_client_id" name="mal_client_id" 
+                               value="{{ config.get('mal', {}).get('client_id', '') }}"
+                               placeholder="Your MAL Client ID" required>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="mal_client_secret" class="form-label">Client Secret</label>
+                        <input type="password" class="form-control" id="mal_client_secret" name="mal_client_secret" 
+                               value="{{ config.get('mal', {}).get('client_secret', '') }}"
+                               placeholder="Your MAL Client Secret" required>
+                    </div>
+                </div>
+            </div>
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i>
+                <strong>How to create a MyAnimeList API application:</strong>
+                <ol class="mb-0 mt-2">
+                    <li>Go to <a href="https://myanimelist.net/apiconfig" target="_blank">MAL API Config</a></li>
+                    <li>Click "Create ID"</li>
+                    <li>Fill in the form:
+                        <ul>
+                            <li><strong>App Name:</strong> Your choice (e.g., "Sonarr Sync")</li>
+                            <li><strong>App Type:</strong> Web</li>
+                            <li><strong>App Description:</strong> Brief description</li>
+                            <li><strong>App Redirect URL:</strong> <code>{{ request.url_root }}callback</code></li>
+                        </ul>
+                    </li>
+                    <li>Copy the Client ID and Client Secret to the fields above</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sync Configuration -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-sync-alt"></i>
+                Sync Settings
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="default_status" class="form-label">Default MAL Status</label>
+                        <select class="form-select" id="default_status" name="default_status">
+                            <option value="watching" {{ 'selected' if config.get('sync', {}).get('default_status') == 'watching' }}>Watching</option>
+                            <option value="completed" {{ 'selected' if config.get('sync', {}).get('default_status') == 'completed' }}>Completed</option>
+                            <option value="on_hold" {{ 'selected' if config.get('sync', {}).get('default_status') == 'on_hold' }}>On Hold</option>
+                            <option value="dropped" {{ 'selected' if config.get('sync', {}).get('default_status') == 'dropped' }}>Dropped</option>
+                            <option value="plan_to_watch" {{ 'selected' if config.get('sync', {}).get('default_status') == 'plan_to_watch' }}>Plan to Watch</option>
+                        </select>
+                        <div class="form-text">Default status for synced anime</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="match_score" class="form-label">Minimum Match Score</label>
+                        <input type="number" class="form-control" id="match_score" name="match_score" 
+                               value="{{ config.get('sync', {}).get('minimum_match_score', 75) }}"
+                               min="0" max="100" step="1">
+                        <div class="form-text">Minimum fuzzy match score (0-100)</div>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="auto_sync" name="auto_sync" 
+                                   {{ 'checked' if config.get('sync', {}).get('auto_sync') }}>
+                            <label class="form-check-label" for="auto_sync">
+                                Enable Auto Sync (Future Feature)
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="sync_interval" class="form-label">Sync Interval (Hours)</label>
+                        <input type="number" class="form-control" id="sync_interval" name="sync_interval" 
+                               value="{{ config.get('sync', {}).get('sync_interval_hours', 24) }}"
+                               min="1" max="168" step="1">
+                        <div class="form-text">Hours between automatic syncs</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Mapping Information -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-info-circle"></i>
+                Status Mapping
+            </h5>
+        </div>
+        <div class="card-body">
+            <p>The sync process automatically maps Sonarr series status to MyAnimeList status:</p>
+            <div class="row">
+                <div class="col-md-6">
+                    <h6>Sonarr Status → MAL Status</h6>
+                    <ul class="list-unstyled">
+                        <li><span class="badge bg-primary">continuing</span> → <span class="badge bg-success">watching</span></li>
+                        <li><span class="badge bg-primary">ended</span> → <span class="badge bg-success">completed</span></li>
+                        <li><span class="badge bg-primary">completed</span> → <span class="badge bg-success">completed</span></li>
+                        <li><span class="badge bg-primary">other</span> → <span class="badge bg-secondary">default status</span></li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h6>Match Score Guidelines</h6>
+                    <ul class="list-unstyled">
+                        <li><span class="badge bg-success">85%+</span> High confidence match</li>
+                        <li><span class="badge bg-warning">65-84%</span> Medium confidence match</li>
+                        <li><span class="badge bg-danger">&lt;65%</span> Low confidence match</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Save Button -->
+    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+        <button type="submit" class="btn btn-primary btn-lg">
+            <i class="fas fa-save"></i>
+            Save Configuration
+        </button>
+    </div>
+</form>
+
+<!-- Current Configuration -->
+{% if config %}
+<div class="card mt-4">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-file-code"></i>
+            Current Configuration
+        </h5>
+    </div>
+    <div class="card-body">
+        <pre class="bg-light p-3 rounded"><code>{{ config | tojson(indent=2) }}</code></pre>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Toggle password visibility
+document.addEventListener('DOMContentLoaded', function() {
+    // Add eye icons to password fields
+    const passwordFields = document.querySelectorAll('input[type="password"]');
+    passwordFields.forEach(field => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'input-group';
+        
+        field.parentNode.insertBefore(wrapper, field);
+        wrapper.appendChild(field);
+        
+        const button = document.createElement('button');
+        button.className = 'btn btn-outline-secondary';
+        button.type = 'button';
+        button.innerHTML = '<i class="fas fa-eye"></i>';
+        button.onclick = function() {
+            if (field.type === 'password') {
+                field.type = 'text';
+                button.innerHTML = '<i class="fas fa-eye-slash"></i>';
+            } else {
+                field.type = 'password';
+                button.innerHTML = '<i class="fas fa-eye"></i>';
+            }
+        };
+        
+        wrapper.appendChild(button);
+    });
+});
+
+// Validate form before submission
+document.querySelector('form').addEventListener('submit', function(e) {
+    const sonarrUrl = document.getElementById('sonarr_url').value;
+    const sonarrKey = document.getElementById('sonarr_key').value;
+    const malClientId = document.getElementById('mal_client_id').value;
+    const malClientSecret = document.getElementById('mal_client_secret').value;
+    
+    if (!sonarrUrl || !sonarrKey || !malClientId || !malClientSecret) {
+        e.preventDefault();
+        alert('Please fill in all required fields.');
+        return;
+    }
+    
+    // Validate URL format
+    try {
+        new URL(sonarrUrl);
+    } catch {
+        e.preventDefault();
+        alert('Please enter a valid Sonarr URL (e.g., http://localhost:8989)');
+        return;
+    }
+});
+</script>
+{% endblock %}
