@@ -7,7 +7,17 @@ mal_token.json
 #Github copilot
 #  This file is used by GitHub Copilot to store user preferences and settings.
 #  It is recommended to keep it out of version control.
-.github/copilot.yml
+.github/
+
+# VSCode settings
+#  This file is used by Visual Studio Code to store user preferences and settings.
+#  It is recommended to keep it out of version control.
+.vscode/
+
+#Docker ignore
+#  This file is used by Docker to ignore files and directories when building images.
+#  It is recommended to keep it out of version control.
+.dockerignore
 
 
 # Byte-compiled / optimized / DLL files
