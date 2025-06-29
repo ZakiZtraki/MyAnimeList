@@ -1,3 +1,10 @@
+# Cofigs with Private keys
+#  These files are used to store private keys and sensitive information.
+#  It is recommended to keep them out of version control.
+config.json
+mal_token.json
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
