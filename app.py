@@ -11,13 +11,19 @@ import time
 from datetime import datetime, timedelta
 from fuzzywuzzy import fuzz, process
 import re
+from flask_socketio import SocketIO, emit
+import uuid
 
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Configuration
 CONFIG_FILE = 'config.json'
 TOKEN_FILE = 'mal_token.json'
+
+# Store active sync sessions
+active_syncs = {}
 
 class MALSonarrSync:
     def __init__(self):
@@ -432,61 +438,132 @@ def api_sync_preview():
 
 @app.route('/api/sync', methods=['POST'])
 def api_sync():
-    """API endpoint to perform actual sync"""
+    """API endpoint to perform actual sync with real-time progress updates"""
     dry_run = request.json.get('dry_run', False)
-    sonarr_anime = sync.get_sonarr_anime()
-    user_list = sync.get_user_anime_list()
+    session_id = str(uuid.uuid4())
     
-    # Get IDs of anime already in user's list
-    existing_ids = {anime['node']['id'] for anime in user_list}
+    # Store session info
+    active_syncs[session_id] = {
+        'status': 'starting',
+        'current_item': 0,
+        'total_items': 0,
+        'results': []
+    }
     
-    sync_results = []
-    min_score = sync.config.get('sync', {}).get('minimum_match_score', 75)
-    default_status = sync.config.get('sync', {}).get('default_status', 'completed')
-    
-    for anime in sonarr_anime:
-        mal_results = sync.search_mal_anime(anime['title'])
-        best_match, score = sync.find_best_match(anime['title'], mal_results)
-        
-        result = {
-            'sonarr_title': anime['title'],
-            'success': False,
-            'message': '',
-            'match_score': score
-        }
-        
-        if not best_match:
-            result['message'] = 'No match found'
-        elif score < min_score:
-            result['message'] = f'Match score too low ({score:.1f}% < {min_score}%)'
-        elif best_match['id'] in existing_ids:
-            result['message'] = 'Already in MAL list'
-            result['success'] = True
-        else:
-            if dry_run:
-                result['message'] = f'Would add: {best_match["title"]} (Score: {score:.1f}%)'
-                result['success'] = True
-            else:
-                # Map Sonarr status to MAL status
-                mal_status = default_status
-                if anime['status'].lower() == 'continuing':
-                    mal_status = 'watching'
-                elif anime['status'].lower() in ['ended', 'completed']:
-                    mal_status = 'completed'
+    def sync_worker():
+        try:
+            sonarr_anime = sync.get_sonarr_anime()
+            user_list = sync.get_user_anime_list()
+            
+            # Get IDs of anime already in user's list
+            existing_ids = {anime['node']['id'] for anime in user_list}
+            
+            total_items = len(sonarr_anime)
+            active_syncs[session_id]['total_items'] = total_items
+            
+            sync_results = []
+            min_score = sync.config.get('sync', {}).get('minimum_match_score', 75)
+            default_status = sync.config.get('sync', {}).get('default_status', 'completed')
+            
+            for i, anime in enumerate(sonarr_anime):
+                current_item = i + 1
+                active_syncs[session_id]['current_item'] = current_item
                 
-                if sync.add_anime_to_list(best_match['id'], mal_status):
-                    result['message'] = f'Added: {best_match["title"]} as {mal_status}'
+                # Emit progress update
+                socketio.emit('sync_progress', {
+                    'session_id': session_id,
+                    'title': anime['title'],
+                    'current': current_item,
+                    'total': total_items,
+                    'status': 'processing'
+                })
+                
+                mal_results = sync.search_mal_anime(anime['title'])
+                best_match, score = sync.find_best_match(anime['title'], mal_results)
+                
+                # Determine result status for filtering
+                if not best_match:
+                    result_status = 'error'  # No match found
+                elif score < min_score:
+                    result_status = 'warning'  # Match score too low
+                elif best_match['id'] in existing_ids:
+                    result_status = 'success'  # Already in list (considered success)
+                else:
+                    result_status = 'success'  # Will be added/was added successfully
+                
+                result = {
+                    'sonarr_title': anime['title'],
+                    'success': False,
+                    'message': '',
+                    'match_score': score,
+                    'status': result_status,
+                    'mal_title': best_match['title'] if best_match else '',
+                    'mal_id': best_match['id'] if best_match else None
+                }
+                
+                if not best_match:
+                    result['message'] = 'No match found'
+                elif score < min_score:
+                    result['message'] = f'Match score too low ({score:.1f}% < {min_score}%)'
+                    result['mal_title'] = best_match['title']
+                elif best_match['id'] in existing_ids:
+                    result['message'] = 'Already in MAL list'
                     result['success'] = True
                 else:
-                    result['message'] = 'Failed to add to MAL'
-        
-        sync_results.append(result)
-        
-        # Add delay to respect rate limits
-        if not dry_run:
-            time.sleep(1)
+                    if dry_run:
+                        result['message'] = f'Would add: {best_match["title"]} (Score: {score:.1f}%)'
+                        result['success'] = True
+                    else:
+                        # Map Sonarr status to MAL status
+                        mal_status = default_status
+                        if anime['status'].lower() == 'continuing':
+                            mal_status = 'watching'
+                        elif anime['status'].lower() in ['ended', 'completed']:
+                            mal_status = 'completed'
+                        
+                        if sync.add_anime_to_list(best_match['id'], mal_status):
+                            result['message'] = f'Added: {best_match["title"]} as {mal_status}'
+                            result['success'] = True
+                        else:
+                            result['message'] = 'Failed to add to MAL'
+                            result['status'] = 'error'
+                
+                sync_results.append(result)
+                active_syncs[session_id]['results'] = sync_results
+                
+                # Add delay to respect rate limits
+                if not dry_run:
+                    time.sleep(1)
+            
+            # Emit completion
+            socketio.emit('sync_complete', {
+                'session_id': session_id,
+                'results': sync_results
+            })
+            
+            active_syncs[session_id]['status'] = 'completed'
+            
+        except Exception as e:
+            socketio.emit('sync_error', {
+                'session_id': session_id,
+                'error': str(e)
+            })
+            active_syncs[session_id]['status'] = 'error'
     
-    return jsonify(sync_results)
+    # Start sync in background thread
+    thread = threading.Thread(target=sync_worker)
+    thread.daemon = True
+    thread.start()
+    
+    return jsonify({'session_id': session_id})
+
+@app.route('/api/sync_status/<session_id>')
+def api_sync_status(session_id):
+    """Get current sync status"""
+    if session_id in active_syncs:
+        return jsonify(active_syncs[session_id])
+    else:
+        return jsonify({'error': 'Session not found'}), 404
 
 @app.route('/api/test_connection')
 def api_test_connection():
@@ -524,5 +601,14 @@ def api_test_connection():
     
     return jsonify(results)
 
+# WebSocket event handlers
+@socketio.on('connect')
+def handle_connect():
+    print('Client connected')
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    print('Client disconnected')
+
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    socketio.run(app, debug=True, host='0.0.0.0', port=5000)
