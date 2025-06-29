@@ -1,0 +1,17 @@
+{
+    "sonarr": {
+        "api_url": "http://10.10.2.5:8989/api/v3/series",
+        "api_key": "a8bb15e326694bdda35fadec8a9bd983"
+    },
+    "mal": {
+        "client_id": "f0656ca6e34f99f9c9ca7e9840bc214b",
+        "client_secret": "55ebc7eaef153dfdd2671d6fa8e09a1d840abbb1de7ff8b3416d4bac60c91c15",
+        "redirect_uri": "http://localhost:8765/callback"
+    },
+    "sync": {
+        "default_status": "completed",
+        "minimum_match_score": 75,
+        "auto_sync": false,
+        "sync_interval_hours": 24
+    }
+}

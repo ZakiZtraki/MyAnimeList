@@ -1,0 +1,17 @@
+{
+    "sonarr": {
+        "api_url": "https://your-sonarr-instance.com/api/v3/series",
+        "api_key": "your-sonarr-api-key"
+    },
+    "mal": {
+        "client_id": "your-mal-client-id",
+        "client_secret": "your-mal-client-secret",
+        "redirect_uri": "http://localhost:8765/callback"
+    },
+    "sync": {
+        "default_status": "completed",
+        "minimum_match_score": 75,
+        "auto_sync": false,
+        "sync_interval_hours": 24
+    }
+}
