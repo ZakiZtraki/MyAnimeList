@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}{{ operation_title or 'Processing' }} - MAL Sonarr Sync{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 text-center">
+        <div class="card">
+            <div class="card-body py-5">
+                <div class="mb-4">
+                    <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+                <h2 class="mb-3">{{ operation_title or 'Processing...' }}</h2>
+                <p class="lead text-muted mb-4">
+                    {{ operation_message or 'Please wait while we process your request.' }}
+                </p>
+                
+                {% if estimated_time %}
+                <div class="alert alert-info" role="alert">
+                    <i class="fas fa-clock"></i>
+                    Estimated time: {{ estimated_time }}
+                </div>
+                {% endif %}
+                
+                <div class="progress mb-4" style="height: 20px;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                         role="progressbar" 
+                         style="width: {{ progress_percent or 25 }}%">
+                        {{ progress_percent or 25 }}%
+                    </div>
+                </div>
+                
+                {% if current_step %}
+                <p class="text-muted">
+                    <i class="fas fa-cog fa-spin"></i>
+                    {{ current_step }}
+                </p>
+                {% endif %}
+                
+                <small class="text-muted">
+                    This page will refresh automatically when the operation is complete.
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Auto-refresh every 5 seconds to check operation status
+{% if session_id %}
+setInterval(function() {
+    fetch('/api/sync_status/{{ session_id }}')
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'complete') {
+                window.location.href = '{{ redirect_url or url_for("index") }}';
+            } else if (data.status === 'error') {
+                window.location.href = '{{ error_url or url_for("index") }}';
+            }
+            // Update progress if available
+            if (data.progress) {
+                const progressBar = document.querySelector('.progress-bar');
+                if (progressBar) {
+                    progressBar.style.width = data.progress + '%';
+                    progressBar.textContent = data.progress + '%';
+                }
+            }
+            // Update current step if available
+            if (data.current_step) {
+                const stepElement = document.querySelector('.text-muted:last-child');
+                if (stepElement) {
+                    stepElement.innerHTML = '<i class="fas fa-cog fa-spin"></i> ' + data.current_step;
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error checking status:', error);
+        });
+}, 5000);
+{% else %}
+// Simple refresh after 30 seconds if no session tracking
+setTimeout(function() {
+    window.location.href = '{{ redirect_url or url_for("index") }}';
+}, 30000);
+{% endif %}
+</script>
+{% endblock %}

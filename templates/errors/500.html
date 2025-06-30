@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Server Error - MAL Sonarr Sync{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 text-center">
+        <div class="card">
+            <div class="card-body py-5">
+                <div class="mb-4">
+                    <i class="fas fa-exclamation-triangle fa-5x text-danger"></i>
+                </div>
+                <h1 class="display-4 mb-3">500</h1>
+                <h2 class="mb-3">Internal Server Error</h2>
+                <p class="lead text-muted mb-4">
+                    Something went wrong on our end. Please try again later or check your configuration.
+                </p>
+                <div class="alert alert-info" role="alert">
+                    <h6 class="alert-heading">Possible causes:</h6>
+                    <ul class="mb-0 text-start">
+                        <li>Sonarr or MyAnimeList API is temporarily unavailable</li>
+                        <li>Invalid API credentials or configuration</li>
+                        <li>Network connectivity issues</li>
+                    </ul>
+                </div>
+                <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                    <a href="{{ url_for('index') }}" class="btn btn-primary btn-lg">
+                        <i class="fas fa-home"></i>
+                        Go to Dashboard
+                    </a>
+                    <a href="{{ url_for('config') }}" class="btn btn-outline-warning btn-lg">
+                        <i class="fas fa-cog"></i>
+                        Check Configuration
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

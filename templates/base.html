@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Automatically sync your anime collection from Sonarr to MyAnimeList">
+    <meta name="author" content="MAL Sonarr Sync">
     <title>{% block title %}MAL Sonarr Sync{% endblock %}</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
@@ -71,6 +73,11 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('config') }}">
                             <i class="fas fa-cog"></i> Configuration
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('about') }}">
+                            <i class="fas fa-info-circle"></i> About
                         </a>
                     </li>
                 </ul>

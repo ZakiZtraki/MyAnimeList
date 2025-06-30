@@ -351,6 +351,11 @@ def config():
     """Configuration page"""
     return render_template('config.html', config=sync.config)
 
+@app.route('/about')
+def about():
+    """About page"""
+    return render_template('about.html')
+
 @app.route('/save_config', methods=['POST'])
 def save_config():
     """Save configuration"""
@@ -600,6 +605,29 @@ def api_test_connection():
         results['messages']['mal'] = f'Connection failed: {str(e)}'
     
     return jsonify(results)
+
+# Error handlers
+@app.errorhandler(404)
+def not_found_error(error):
+    return render_template('errors/404.html'), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    return render_template('errors/500.html'), 500
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    # Pass through HTTP errors
+    if hasattr(e, 'code'):
+        return e
+    
+    # Handle non-HTTP exceptions
+    app.logger.error(f'Unhandled exception: {e}')
+    return render_template('errors/error.html', 
+                         error_code='500',
+                         error_title='Internal Server Error',
+                         error_message='An unexpected error occurred.',
+                         error_details=str(e) if app.debug else None), 500
 
 # WebSocket event handlers
 @socketio.on('connect')
