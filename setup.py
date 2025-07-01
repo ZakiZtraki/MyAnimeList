@@ -71,7 +71,7 @@ def create_config():
 
 def check_dependencies():
     """Check if required packages are installed"""
-    required_packages = ["requests", "fuzzywuzzy", "python-levenshtein"]
+    required_packages = ["requests", "fuzzywuzzy", "python-levenshtein", "flask", "flask-socketio"]
     missing_packages = []
     
     for package in required_packages:

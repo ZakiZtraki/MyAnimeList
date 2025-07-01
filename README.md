@@ -20,6 +20,8 @@ Automatically sync your anime from Sonarr to your MyAnimeList account using OAut
 
 ## Installation
 
+### Method 1: Python (Local)
+
 1. Clone this repository:
    ```bash
    git clone <repository-url>
@@ -34,6 +36,33 @@ Automatically sync your anime from Sonarr to your MyAnimeList account using OAut
 3. Run the setup script:
    ```bash
    python setup.py
+   ```
+
+### Method 2: Docker (Recommended for Easy Setup)
+
+1. Build the Docker image:
+   ```bash
+   docker compose build
+   ```
+   Or, to build without cache:
+   ```bash
+   docker compose build --no-cache
+   ```
+
+2. Start the application:
+   ```bash
+   docker compose up
+   ```
+   The web interface will be available at [http://localhost:5000](http://localhost:5000)
+
+3. (Optional) To run in detached/background mode:
+   ```bash
+   docker compose up -d
+   ```
+
+4. To stop the application:
+   ```bash
+   docker compose down
    ```
 
 ## Configuration
