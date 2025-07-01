@@ -2,7 +2,7 @@
 echo Installing MAL-Sonarr Sync dependencies...
 echo.
 
-pip install requests fuzzywuzzy python-levenshtein
+pip install requests fuzzywuzzy python-levenshtein flask flask_socketio
 
 echo.
 echo Dependencies installed!
