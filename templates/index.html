@@ -12,6 +12,26 @@
     </div>
 </div>
 
+<!-- Progress Modal Overlay -->
+<div id="progress-modal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; z-index:2000; background:rgba(0,0,0,0.3); backdrop-filter: blur(6px);">
+    <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:rgba(255,255,255,0.95); border-radius:18px; box-shadow:0 8px 32px rgba(0,0,0,0.2); padding:40px 32px; min-width:320px; text-align:center; animation:fadeInScale 0.4s cubic-bezier(.4,2,.6,1);">
+        <div style="font-size:2.2em; margin-bottom:10px; color:#007bff;">
+            <i class="fas fa-spinner fa-spin"></i>
+        </div>
+        <div id="progress-modal-title" style="font-size:1.2em; font-weight:600; margin-bottom:8px;">Comparing...</div>
+        <div id="progress-modal-item" style="font-size:1.1em; margin-bottom:8px;"></div>
+        <div id="progress-modal-progress" style="font-size:1em; color:#666;"></div>
+    </div>
+</div>
+<style>
+@keyframes fadeInScale {
+  0% { opacity:0; transform:translate(-50%,-50%) scale(0.85); }
+  100% { opacity:1; transform:translate(-50%,-50%) scale(1); }
+}
+.filter-badge { cursor:pointer; transition:all 0.2s; border:2px solid transparent; }
+.filter-badge.active { box-shadow:0 0 0 2px #3332,0 2px 8px #0001; border-color:#333; background:#e9f7ef!important; }
+</style>
+
 <!-- Connection Status -->
 <div class="row connection-status">
     <div class="col-md-6">
@@ -92,6 +112,16 @@
                         <p class="text-muted">Test the sync process without adding anything to MAL</p>
                     </div>
                     <div class="col-md-4">
+                        <button type="button" class="btn btn-info btn-lg w-100 mb-3" onclick="previewSync()">
+                            <i class="fas fa-eye"></i>
+                            <div class="loading-spinner" id="preview-spinner">
+                                <i class="fas fa-spinner fa-spin"></i>
+                            </div>
+                            Preview Sync
+                        </button>
+                        <p class="text-muted">See what would be synced without making changes</p>
+                    </div>
+                    <div class="col-md-4">
                         <button type="button" class="btn btn-success btn-lg w-100 mb-3" onclick="performSync()">
                             <i class="fas fa-sync"></i>
                             <div class="loading-spinner" id="sync-spinner">
@@ -107,7 +137,7 @@
     </div>
 </div>
 
-<!-- Results Section -->
+<!-- Results Section with Interactive Filter Bar -->
 <div class="row mt-4">
     <div class="col-md-12">
         <div class="card" id="results-card" style="display: none;">
@@ -116,10 +146,10 @@
                     <i class="fas fa-list-ul"></i>
                     <span id="results-title">Results</span>
                 </h5>
-                <div>
-                    <span class="badge bg-success" id="success-count">0</span>
-                    <span class="badge bg-warning" id="warning-count">0</span>
-                    <span class="badge bg-danger" id="error-count">0</span>
+                <div id="filter-bar" class="d-flex gap-2">
+                    <span class="badge bg-success filter-badge" id="filter-success" onclick="toggleFilter('success')">0</span>
+                    <span class="badge bg-warning filter-badge" id="filter-warning" onclick="toggleFilter('warning')">0</span>
+                    <span class="badge bg-danger filter-badge" id="filter-error" onclick="toggleFilter('error')">0</span>
                 </div>
             </div>
             <div class="card-body">
@@ -162,44 +192,167 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
 let currentResults = [];
+let activeFilter = null;
+
+// Progress Modal Functions
+function showProgressModal(title, item, progress) {
+    document.getElementById('progress-modal-title').textContent = title || 'Comparing...';
+    document.getElementById('progress-modal-item').textContent = item || '';
+    document.getElementById('progress-modal-progress').textContent = progress || '';
+    document.getElementById('progress-modal').style.display = 'block';
+}
+function hideProgressModal() {
+    document.getElementById('progress-modal').style.display = 'none';
+}
+
+// --- Interactive Filter System ---
+function updateFilterCounts(data, mode) {
+    let success = 0, warning = 0, error = 0;
+    if (mode === 'sync') {
+        data.forEach(item => {
+            if (item.success || (item.message && item.message.includes('Already in'))) success++;
+            else if (item.message && item.message.includes('score too low')) warning++;
+            else error++;
+        });
+    } else {
+        data.forEach(item => {
+            if (item.will_sync) success++;
+            else if (item.match_found && item.match_score < 75) warning++;
+            else error++;
+        });
+    }
+    document.getElementById('filter-success').textContent = success;
+    document.getElementById('filter-warning').textContent = warning;
+    document.getElementById('filter-error').textContent = error;
+}
+
+function toggleFilter(type) {
+    if (activeFilter === type) {
+        activeFilter = null;
+    } else {
+        activeFilter = type;
+    }
+    renderResults(currentResults, document.getElementById('results-title').textContent);
+    // Visual feedback
+    ['success','warning','error'].forEach(t => {
+        const el = document.getElementById('filter-' + t);
+        if (el) el.classList.toggle('active', activeFilter === t);
+    });
+}
+
+function renderResults(data, title) {
+    const resultsCard = document.getElementById('results-card');
+    const resultsTitle = document.getElementById('results-title');
+    const resultsContainer = document.getElementById('results-container');
+    resultsTitle.textContent = title;
+    resultsCard.style.display = 'block';
+    let mode = (data.length && data[0].hasOwnProperty('success')) ? 'sync' : 'preview';
+    updateFilterCounts(data, mode);
+    // Filtering
+    let filtered = data;
+    if (activeFilter) {
+        if (mode === 'sync') {
+            filtered = data.filter(item => {
+                if (activeFilter === 'success') return item.success || (item.message && item.message.includes('Already in'));
+                if (activeFilter === 'warning') return item.message && item.message.includes('score too low');
+                if (activeFilter === 'error') return !(item.success || (item.message && (item.message.includes('Already in') || item.message.includes('score too low'))));
+            });
+        } else {
+            filtered = data.filter(item => {
+                if (activeFilter === 'success') return item.will_sync;
+                if (activeFilter === 'warning') return item.match_found && item.match_score < 75;
+                if (activeFilter === 'error') return !(item.will_sync || (item.match_found && item.match_score < 75));
+            });
+        }
+    }
+    // Generate HTML
+    let html = '';
+    if (mode === 'sync') {
+        filtered.forEach(item => {
+            const scoreClass = item.match_score >= 85 ? 'high-score' : item.match_score >= 65 ? 'medium-score' : 'low-score';
+            const resultClass = item.success ? 'will-sync' : 'wont-sync';
+            html += `<div class="sync-item ${resultClass}"><div class="row"><div class="col-md-6"><h6>${item.sonarr_title}</h6></div><div class="col-md-4"><span class="match-score ${scoreClass}">${item.match_score.toFixed(1)}%</span></div><div class="col-md-2 text-end">${item.success ? '<span class="badge bg-success">Success</span>' : '<span class="badge bg-danger">Failed</span>'}</div></div><div class="row mt-2"><div class="col-md-12"><small class="text-muted">${item.message}</small></div></div></div>`;
+        });
+    } else {
+        filtered.forEach(item => {
+            const scoreClass = item.match_score >= 85 ? 'high-score' : item.match_score >= 65 ? 'medium-score' : 'low-score';
+            const syncClass = item.will_sync ? 'will-sync' : item.already_in_list ? 'already-synced' : 'wont-sync';
+            html += `<div class="sync-item ${syncClass}"><div class="row"><div class="col-md-6"><h6>${item.sonarr_title}</h6><small class="text-muted">Status: ${item.sonarr_status}</small></div><div class="col-md-4">${item.match_found ? `<strong>${item.mal_title}</strong><br><small class="text-muted">MAL ID: ${item.mal_id}</small>` : '<em>No match found</em>'}</div><div class="col-md-2 text-end"><span class="match-score ${scoreClass}">${item.match_score.toFixed(1)}%</span><br>${item.will_sync ? '<span class="badge bg-success">Will Sync</span>' : item.already_in_list ? '<span class="badge bg-secondary">In List</span>' : '<span class="badge bg-warning">Skip</span>'}</div></div></div>`;
+        });
+    }
+    resultsContainer.innerHTML = html;
+}
+
+function displayResults(data, title) {
+    currentResults = data;
+    activeFilter = null;
+    renderResults(data, title);
+    // Reset filter badge highlights
+    ['success','warning','error'].forEach(t => {
+        const el = document.getElementById('filter-' + t);
+        if (el) el.classList.remove('active');
+    });
+}
+
+function displaySyncResults(data, title) {
+    currentResults = data;
+    activeFilter = null;
+    renderResults(data, title);
+    // Reset filter badge highlights
+    ['success','warning','error'].forEach(t => {
+        const el = document.getElementById('filter-' + t);
+        if (el) el.classList.remove('active');
+    });
+}
+
+// --- Progress Modal Integration for Sync ---
+// Example: showProgressModal('Looking for Black Clover', 'Item 45 of 138');
+// You should call showProgressModal/hideProgressModal from your WebSocket or fetch logic as needed.
+
+function dryRunSync() {
+    showLoading('dryrun-spinner');
+    showProgressModal('Starting Dry Run...', '', '');
+    fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dry_run: true })
+    })
+    .then(response => response.json())
+    .then(data => {
+        // data.session_id is returned
+        // Wait for sync_complete event for this session
+        socket.once('sync_complete', function(eventData) {
+            hideLoading('dryrun-spinner');
+            hideProgressModal();
+            displaySyncResults(eventData.results, 'Dry Run Results');
+        });
+    })
+    .catch(error => {
+        hideLoading('dryrun-spinner');
+        hideProgressModal();
+        console.error('Error:', error);
+        alert('Error performing dry run: ' + error.message);
+    });
+}
 
 function previewSync() {
     showLoading('preview-spinner');
-    
+    showProgressModal('Starting Preview...', '', '');
     fetch('/api/sync_preview')
         .then(response => response.json())
         .then(data => {
             hideLoading('preview-spinner');
+            hideProgressModal();
             displayResults(data, 'Sync Preview');
         })
         .catch(error => {
             hideLoading('preview-spinner');
+            hideProgressModal();
             console.error('Error:', error);
             alert('Error loading preview: ' + error.message);
-        });
-}
-
-function dryRunSync() {
-    showLoading('dryrun-spinner');
-    
-    fetch('/api/sync', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ dry_run: true })
-    })
-        .then(response => response.json())
-        .then(data => {
-            hideLoading('dryrun-spinner');
-            displaySyncResults(data, 'Dry Run Results');
-        })
-        .catch(error => {
-            hideLoading('dryrun-spinner');
-            console.error('Error:', error);
-            alert('Error performing dry run: ' + error.message);
         });
 }
 
@@ -207,196 +360,65 @@ function performSync() {
     if (!confirm('This will add anime to your MyAnimeList. Are you sure you want to continue?')) {
         return;
     }
-    
     showLoading('sync-spinner');
-    
+    showProgressModal('Starting Sync...', '', '');
     fetch('/api/sync', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dry_run: false })
     })
-        .then(response => response.json())
-        .then(data => {
+    .then(response => response.json())
+    .then(data => {
+        // data.session_id is returned
+        // Wait for sync_complete event for this session
+        socket.once('sync_complete', function(eventData) {
             hideLoading('sync-spinner');
-            displaySyncResults(data, 'Sync Results');
-        })
-        .catch(error => {
-            hideLoading('sync-spinner');
-            console.error('Error:', error);
-            alert('Error performing sync: ' + error.message);
+            hideProgressModal();
+            displaySyncResults(eventData.results, 'Sync Results');
         });
+    })
+    .catch(error => {
+        hideLoading('sync-spinner');
+        hideProgressModal();
+        console.error('Error:', error);
+        alert('Error performing sync: ' + error.message);
+    });
 }
 
-function displayResults(data, title) {
-    currentResults = data;
-    
-    const resultsCard = document.getElementById('results-card');
-    const resultsTitle = document.getElementById('results-title');
-    const resultsContainer = document.getElementById('results-container');
-    
-    resultsTitle.textContent = title;
-    resultsCard.style.display = 'block';
-    
-    // Update counters
-    let successCount = 0;
-    let warningCount = 0;
-    let errorCount = 0;
-    
-    data.forEach(item => {
-        if (item.will_sync) {
-            successCount++;
-        } else if (item.match_found && item.match_score < 75) {
-            warningCount++;
-        } else {
-            errorCount++;
-        }
-    });
-    
-    document.getElementById('success-count').textContent = successCount;
-    document.getElementById('warning-count').textContent = warningCount;
-    document.getElementById('error-count').textContent = errorCount;
-    
-    // Generate HTML
-    let html = '';
-    data.forEach(item => {
-        const scoreClass = item.match_score >= 85 ? 'high-score' : 
-                          item.match_score >= 65 ? 'medium-score' : 'low-score';
-        
-        const syncClass = item.will_sync ? 'will-sync' : 
-                         item.already_in_list ? 'already-synced' : 'wont-sync';
-        
-        html += `
-            <div class="sync-item ${syncClass}">
-                <div class="row">
-                    <div class="col-md-6">
-                        <h6>${item.sonarr_title}</h6>
-                        <small class="text-muted">Status: ${item.sonarr_status}</small>
-                    </div>
-                    <div class="col-md-4">
-                        ${item.match_found ? `
-                            <strong>${item.mal_title}</strong><br>
-                            <small class="text-muted">MAL ID: ${item.mal_id}</small>
-                        ` : '<em>No match found</em>'}
-                    </div>
-                    <div class="col-md-2 text-end">
-                        <span class="match-score ${scoreClass}">${item.match_score.toFixed(1)}%</span><br>
-                        ${item.will_sync ? '<span class="badge bg-success">Will Sync</span>' : 
-                          item.already_in_list ? '<span class="badge bg-secondary">In List</span>' : 
-                          '<span class="badge bg-warning">Skip</span>'}
-                    </div>
-                </div>
-            </div>
-        `;
-    });
-    
-    resultsContainer.innerHTML = html;
-}
+// Connect to Socket.IO
+const socket = io();
 
-function displaySyncResults(data, title) {
-    currentResults = data;
-    
-    const resultsCard = document.getElementById('results-card');
-    const resultsTitle = document.getElementById('results-title');
-    const resultsContainer = document.getElementById('results-container');
-    
-    resultsTitle.textContent = title;
-    resultsCard.style.display = 'block';
-    
-    // Update counters
-    let successCount = 0;
-    let warningCount = 0;
-    let errorCount = 0;
-    
-    data.forEach(item => {
-        if (item.success) {
-            successCount++;
-        } else if (item.message.includes('score too low') || item.message.includes('Already in')) {
-            warningCount++;
-        } else {
-            errorCount++;
-        }
-    });
-    
-    document.getElementById('success-count').textContent = successCount;
-    document.getElementById('warning-count').textContent = warningCount;
-    document.getElementById('error-count').textContent = errorCount;
-    
-    // Generate HTML
-    let html = '';
-    data.forEach(item => {
-        const scoreClass = item.match_score >= 85 ? 'high-score' : 
-                          item.match_score >= 65 ? 'medium-score' : 'low-score';
-        
-        const resultClass = item.success ? 'will-sync' : 'wont-sync';
-        
-        html += `
-            <div class="sync-item ${resultClass}">
-                <div class="row">
-                    <div class="col-md-6">
-                        <h6>${item.sonarr_title}</h6>
-                    </div>
-                    <div class="col-md-4">
-                        <span class="match-score ${scoreClass}">${item.match_score.toFixed(1)}%</span>
-                    </div>
-                    <div class="col-md-2 text-end">
-                        ${item.success ? '<span class="badge bg-success">Success</span>' : 
-                          '<span class="badge bg-danger">Failed</span>'}
-                    </div>
-                </div>
-                <div class="row mt-2">
-                    <div class="col-md-12">
-                        <small class="text-muted">${item.message}</small>
-                    </div>
-                </div>
-            </div>
-        `;
-    });
-    
-    resultsContainer.innerHTML = html;
-}
+// Listen for sync progress events
+socket.on('sync_progress', function(data) {
+    // Example: data = { session_id, title, current, total, status }
+    showProgressModal(
+        'Looking for ' + (data.title || ''),
+        `Item ${data.current} of ${data.total}`,
+        ''
+    );
+});
+
+// Listen for sync complete event
+socket.on('sync_complete', function(data) {
+    hideProgressModal();
+});
 
 function loadSonarrAnime() {
     const container = document.getElementById('sonarr-anime-list');
     container.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
-    
     fetch('/api/sonarr_anime')
         .then(response => response.json())
         .then(data => {
             let html = '';
-            
             if (data.length === 0) {
                 html = '<div class="alert alert-info">No anime found in Sonarr. Make sure your series have "anime" tags.</div>';
             } else {
-                html = `
-                    <div class="mb-3">
-                        <strong>${data.length}</strong> anime series found in Sonarr
-                    </div>
-                    <div class="row">
-                `;
-                
+                html = `<div class="mb-3"><strong>${data.length}</strong> anime series found in Sonarr</div><div class="row">`;
                 data.forEach(anime => {
-                    html += `
-                        <div class="col-md-6 col-lg-4 mb-3">
-                            <div class="card h-100">
-                                <div class="card-body">
-                                    <h6 class="card-title">${anime.title}</h6>
-                                    <p class="card-text">
-                                        <small class="text-muted">
-                                            Status: ${anime.status}<br>
-                                            ${anime.year ? `Year: ${anime.year}` : ''}
-                                        </small>
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    `;
+                    html += `<div class="col-md-6 col-lg-4 mb-3"><div class="card h-100"><div class="card-body"><h6 class="card-title">${anime.title}</h6><p class="card-text"><small class="text-muted">Status: ${anime.status}<br>${anime.year ? `Year: ${anime.year}` : ''}</small></p></div></div></div>`;
                 });
-                
                 html += '</div>';
             }
-            
             container.innerHTML = html;
         })
         .catch(error => {
@@ -408,14 +430,4 @@ function loadSonarrAnime() {
 // Auto-refresh connection status every 30 seconds
 setInterval(updateConnectionStatus, 30000);
 </script>
-{% endblock %}button" class="btn btn-info btn-lg w-100 mb-3" onclick="previewSync()">
-                            <i class="fas fa-eye"></i>
-                            <div class="loading-spinner" id="preview-spinner">
-                                <i class="fas fa-spinner fa-spin"></i>
-                            </div>
-                            Preview Sync
-                        </button>
-                        <p class="text-muted">See what would be synced without making changes</p>
-                    </div>
-                    <div class="col-md-4">
-                        <button type="
+{% endblock %}

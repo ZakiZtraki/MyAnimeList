@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block title %}{{ status_title or 'Status' }} - MAL Sonarr Sync{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">
+                    {% if status_type == 'success' %}
+                        <i class="fas fa-check-circle text-success"></i>
+                    {% elif status_type == 'warning' %}
+                        <i class="fas fa-exclamation-triangle text-warning"></i>
+                    {% elif status_type == 'error' %}
+                        <i class="fas fa-times-circle text-danger"></i>
+                    {% else %}
+                        <i class="fas fa-info-circle text-info"></i>
+                    {% endif %}
+                    {{ status_title or 'Operation Status' }}
+                </h4>
+            </div>
+            <div class="card-body">
+                {% if status_message %}
+                <p class="lead">{{ status_message }}</p>
+                {% endif %}
+                
+                {% if status_details %}
+                <div class="row">
+                    <div class="col-md-12">
+                        <h5>Details:</h5>
+                        {% if status_details is string %}
+                            <p>{{ status_details }}</p>
+                        {% else %}
+                            <ul class="list-group list-group-flush">
+                                {% for detail in status_details %}
+                                <li class="list-group-item">
+                                    {% if detail.type == 'success' %}
+                                        <i class="fas fa-check text-success me-2"></i>
+                                    {% elif detail.type == 'warning' %}
+                                        <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+                                    {% elif detail.type == 'error' %}
+                                        <i class="fas fa-times text-danger me-2"></i>
+                                    {% else %}
+                                        <i class="fas fa-info text-info me-2"></i>
+                                    {% endif %}
+                                    {{ detail.message }}
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if sync_results %}
+                <div class="row mt-4">
+                    <div class="col-md-12">
+                        <h5>Sync Results:</h5>
+                        <div class="mb-3">
+                            <span class="badge bg-success me-2">{{ sync_results.success_count or 0 }} Successful</span>
+                            <span class="badge bg-warning me-2">{{ sync_results.warning_count or 0 }} Warnings</span>
+                            <span class="badge bg-danger">{{ sync_results.error_count or 0 }} Errors</span>
+                        </div>
+                        
+                        {% if sync_results.items %}
+                        <div class="accordion" id="resultsAccordion">
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="headingResults">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseResults">
+                                        View Detailed Results
+                                    </button>
+                                </h2>
+                                <div id="collapseResults" class="accordion-collapse collapse" data-bs-parent="#resultsAccordion">
+                                    <div class="accordion-body">
+                                        {% for item in sync_results.items %}
+                                        <div class="sync-item {{ 'will-sync' if item.success else 'wont-sync' }}">
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <h6>{{ item.sonarr_title }}</h6>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    {% if item.match_score %}
+                                                    <span class="match-score {{ 'high-score' if item.match_score >= 85 else ('medium-score' if item.match_score >= 65 else 'low-score') }}">
+                                                        {{ item.match_score }}% match
+                                                    </span>
+                                                    {% endif %}
+                                                </div>
+                                                <div class="col-md-2 text-end">
+                                                    {% if item.success %}
+                                                        <span class="badge bg-success">Success</span>
+                                                    {% else %}
+                                                        <span class="badge bg-danger">Failed</span>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                            {% if item.message %}
+                                            <div class="row mt-2">
+                                                <div class="col-md-12">
+                                                    <small class="text-muted">{{ item.message }}</small>
+                                                </div>
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                <div class="mt-4">
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                        <a href="{{ url_for('index') }}" class="btn btn-primary btn-lg">
+                            <i class="fas fa-home"></i>
+                            Back to Dashboard
+                        </a>
+                        {% if status_type == 'success' and show_sync_again %}
+                        <button type="button" class="btn btn-outline-success btn-lg" onclick="window.location.reload()">
+                            <i class="fas fa-sync"></i>
+                            Sync Again
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

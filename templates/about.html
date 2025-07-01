@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+
+{% block title %}About - MAL Sonarr Sync{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1 class="mb-4">
+            <i class="fas fa-info-circle"></i>
+            About MAL Sonarr Sync
+        </h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-rocket"></i>
+                    What is MAL Sonarr Sync?
+                </h5>
+            </div>
+            <div class="card-body">
+                <p>
+                    MAL Sonarr Sync is a web application that automatically synchronizes your anime collection 
+                    from Sonarr to your MyAnimeList account. It uses advanced fuzzy matching algorithms to 
+                    accurately match anime titles and helps keep your MAL list up-to-date with minimal effort.
+                </p>
+                
+                <h6>Key Features:</h6>
+                <ul>
+                    <li><strong>Automatic Matching:</strong> Intelligent fuzzy matching to find the correct anime on MAL</li>
+                    <li><strong>Preview Mode:</strong> See what will be synced before making changes</li>
+                    <li><strong>Dry Run:</strong> Test the sync process without adding anything to your MAL list</li>
+                    <li><strong>Configurable Thresholds:</strong> Set minimum match scores to avoid false positives</li>
+                    <li><strong>Real-time Status:</strong> Live connection status for both Sonarr and MyAnimeList</li>
+                    <li><strong>Detailed Logging:</strong> Comprehensive sync results and error reporting</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-cogs"></i>
+                    How It Works
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-download text-primary"></i> Step 1: Fetch Data</h6>
+                        <p class="text-muted">Retrieves your anime series from Sonarr and your existing MAL list</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-search text-info"></i> Step 2: Search & Match</h6>
+                        <p class="text-muted">Searches MAL for each anime and finds the best matches using fuzzy logic</p>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-filter text-warning"></i> Step 3: Filter Results</h6>
+                        <p class="text-muted">Applies your configured minimum match score and excludes already-added anime</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-plus text-success"></i> Step 4: Add to MAL</h6>
+                        <p class="text-muted">Adds the matched anime to your MAL list with the appropriate status</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-question-circle"></i>
+                    Frequently Asked Questions
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="accordion" id="faqAccordion">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq1">
+                                How accurate is the anime matching?
+                            </button>
+                        </h2>
+                        <div id="faq1" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body">
+                                The matching system uses multiple fuzzy matching algorithms and compares against 
+                                both original and alternative titles. Match scores above 85% are typically very 
+                                accurate, while scores between 65-84% should be reviewed manually.
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">
+                                Will this overwrite my existing MAL list?
+                            </button>
+                        </h2>
+                        <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body">
+                                No, the sync process only adds new anime to your list. It will not modify or 
+                                remove existing entries. If an anime is already in your MAL list, it will be skipped.
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq3">
+                                What anime status will be set on MAL?
+                            </button>
+                        </h2>
+                        <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body">
+                                The status is automatically determined based on the Sonarr series status:
+                                <ul>
+                                    <li>Continuing series → Watching</li>
+                                    <li>Ended/Completed series → Completed</li>
+                                    <li>Other statuses → Your configured default status</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq4">
+                                How do I identify anime in Sonarr?
+                            </button>
+                        </h2>
+                        <div id="faq4" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body">
+                                The app identifies anime series in Sonarr by checking for:
+                                <ul>
+                                    <li>Series tagged with "anime"</li>
+                                    <li>Series type set to "anime"</li>
+                                    <li>Series in folders containing "anime"</li>
+                                    <li>Titles with common anime naming patterns</li>
+                                </ul>
+                                Make sure to properly tag your anime series in Sonarr for best results.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-link"></i>
+                    Quick Links
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('index') }}" class="btn btn-primary">
+                        <i class="fas fa-tachometer-alt"></i>
+                        Dashboard
+                    </a>
+                    <a href="{{ url_for('config') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-cog"></i>
+                        Configuration
+                    </a>
+                    <a href="https://sonarr.tv/" target="_blank" class="btn btn-outline-info">
+                        <i class="fas fa-external-link-alt"></i>
+                        Sonarr Website
+                    </a>
+                    <a href="https://myanimelist.net/" target="_blank" class="btn btn-outline-success">
+                        <i class="fas fa-external-link-alt"></i>
+                        MyAnimeList
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-bar"></i>
+                    Match Score Guide
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="badge bg-success">90-100%</span>
+                        <small>Excellent Match</small>
+                    </div>
+                    <div class="progress mt-1" style="height: 5px;">
+                        <div class="progress-bar bg-success" style="width: 100%"></div>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="badge bg-success">85-89%</span>
+                        <small>Very Good Match</small>
+                    </div>
+                    <div class="progress mt-1" style="height: 5px;">
+                        <div class="progress-bar bg-success" style="width: 87%"></div>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="badge bg-warning">75-84%</span>
+                        <small>Good Match</small>
+                    </div>
+                    <div class="progress mt-1" style="height: 5px;">
+                        <div class="progress-bar bg-warning" style="width: 80%"></div>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="badge bg-warning">65-74%</span>
+                        <small>Fair Match</small>
+                    </div>
+                    <div class="progress mt-1" style="height: 5px;">
+                        <div class="progress-bar bg-warning" style="width: 70%"></div>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="badge bg-danger">&lt;65%</span>
+                        <small>Poor Match</small>
+                    </div>
+                    <div class="progress mt-1" style="height: 5px;">
+                        <div class="progress-bar bg-danger" style="width: 50%"></div>
+                    </div>
+                </div>
+                
+                <small class="text-muted">
+                    Lower scores may indicate incorrect matches. Adjust your minimum match score in configuration.
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
