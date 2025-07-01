@@ -213,8 +213,8 @@ function updateFilterCounts(data, mode) {
     let success = 0, warning = 0, error = 0;
     if (mode === 'sync') {
         data.forEach(item => {
-            if (item.success) success++;
-            else if (item.message && (item.message.includes('score too low') || item.message.includes('Already in'))) warning++;
+            if (item.success || (item.message && item.message.includes('Already in'))) success++;
+            else if (item.message && item.message.includes('score too low')) warning++;
             else error++;
         });
     } else {
@@ -256,9 +256,9 @@ function renderResults(data, title) {
     if (activeFilter) {
         if (mode === 'sync') {
             filtered = data.filter(item => {
-                if (activeFilter === 'success') return item.success;
-                if (activeFilter === 'warning') return item.message && (item.message.includes('score too low') || item.message.includes('Already in'));
-                if (activeFilter === 'error') return !(item.success || (item.message && (item.message.includes('score too low') || item.message.includes('Already in'))));
+                if (activeFilter === 'success') return item.success || (item.message && item.message.includes('Already in'));
+                if (activeFilter === 'warning') return item.message && item.message.includes('score too low');
+                if (activeFilter === 'error') return !(item.success || (item.message && (item.message.includes('Already in') || item.message.includes('score too low'))));
             });
         } else {
             filtered = data.filter(item => {
